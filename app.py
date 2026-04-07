@@ -77,15 +77,17 @@ if "predictions_list" not in st.session_state:
 
 # Load/save functions
 def load_predictions():
-    if "predictions_list" not in st.session_state or not st.session_state.predictions_list:
-        if os.path.exists(REPORT_FILE):
-            try:
-                df = pd.read_csv(REPORT_FILE)
-                st.session_state.predictions_list = df.to_dict('records')
-            except:
-                st.session_state.predictions_list = []
+    if os.path.exists(REPORT_FILE):
+        try:
+            df = pd.read_csv(REPORT_FILE)
+            # Ensure Risk_Score is numeric
+            if 'Risk_Score' in df.columns:
+                df['Risk_Score'] = pd.to_numeric(df['Risk_Score'], errors='coerce').fillna(0)
+            st.session_state.predictions_list = df.to_dict('records')
+        except:
+            st.session_state.predictions_list = []
 
-def save_predictions():
+def save_prediction(record):
     df = pd.DataFrame(st.session_state.predictions_list)
     df.to_csv(REPORT_FILE, index=False)
 
@@ -96,7 +98,7 @@ st.markdown("""
 <style>
     .main-header {
         font-size: 2rem;
-        color: #f39c12; /* bright orange */
+        color: #f39c12; 
         text-align: center;
         padding: 1rem;
     }
@@ -223,8 +225,8 @@ else:
             # PREDICTION
             pred = model.predict(input_scaled)[0]
             proba = model.predict_proba(input_scaled)
-            proba = proba[0]
-            risk_score = float(proba[1]) * 100
+            proba = proba[0]  # first row
+            risk_score = float(proba[1]) * 100  # numeric 0-100
 
             st.session_state.prediction = pred
             st.session_state.proba = proba
@@ -239,8 +241,7 @@ else:
                 'risk_level': risk_level_label,
                 'bmi_category': bmi_category_label
             }
-            # append & save properly
-            st.session_state.predictions_list.append({
+            record = {
                 "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "Username": st.session_state.username,
                 "Pregnancies": pregnancies,
@@ -256,11 +257,12 @@ else:
                 "Prediction": "Diabetic" if pred == 1 else "Not Diabetic",
                 "Probability_Not_Diabetic": round(float(proba[0]), 4),
                 "Probability_Diabetic": round(float(proba[1]), 4),
-                "Risk_Score": round(risk_score, 1)
-            })
-            save_predictions()
+                "Risk_Score": float(round(risk_score, 1))
+            }
+            st.session_state.predictions_list.append(record)
+            save_prediction(record)
             st.success("Prediction complete! Check the Results tab.")
-            
+
 # ==================== TAB 2: MY RESULTS ====================
     with tabs[1]:
         st.header("Your Prediction Results")
@@ -275,7 +277,7 @@ else:
                 diabetic_count = len([p for p in user_records if p.get('Prediction') == 'Diabetic'])
                 st.metric("Diabetic Cases", diabetic_count)
             with col3:
-                avg_risk = np.mean([p.get('Risk_Score', 0) for p in user_records])
+                avg_risk = np.mean([float(p.get('Risk_Score', 0)) for p in user_records])
                 st.metric("Average Risk Score", f"{avg_risk:.1f}%")
             with col4:
                 st.metric("Most Recent", user_records[-1].get('Timestamp', 'N/A')[:10])
@@ -291,6 +293,7 @@ else:
             st.dataframe(display_df, use_container_width=True)
         else:
             st.info("No predictions yet. Go to the New Prediction tab to make your first prediction!")
+            
     
     # ==================== TAB 3: VISUALIZATIONS ====================
     with tabs[2]:
