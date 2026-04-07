@@ -90,45 +90,37 @@ def save_prediction(record):
 
 load_predictions()
 
-# Custom CSS
+# Custom CSS for dark visibility
 st.markdown("""
 <style>
-    /* Main header - bright and visible */
     .main-header {
         font-size: 2rem;
         color: #f39c12; /* bright orange */
         text-align: center;
         padding: 1rem;
     }
-
-    /* Info box - dark but readable */
     .info-box {
-        background-color: #2c3e50; /* dark gray background */
-        color: #ecf0f1; /* light text */
+        background-color: #2c3e50; 
+        color: #ecf0f1; 
         padding: 1rem;
         border-radius: 10px;
         margin: 1rem 0;
     }
-
-    /* Buttons - bright for dark background */
     div.stButton > button:first-child {
-        background-color: #e74c3c; /* red button */
+        background-color: #e74c3c; 
         color: white;
-        height: 3ems
+        height: 3em;
         width: 100%;
         border-radius: 10px;
         border: none;
         font-weight: bold;
     }
-
     div.stButton > button:hover {
-        background-color: #c0392b; /* darker red on hover */
+        background-color: #c0392b;
         color: white;
     }
-
-    /* Metric numbers - visible on dark sidebar */
     [data-testid="stMetricValue"] {
-        color: #f1c40f !important; /* bright yellow */
+        color: #f1c40f !important;
         font-weight: bold;
     }
 </style>
@@ -223,16 +215,16 @@ else:
             
             # SCALE INPUT
             input_scaled = scaler.transform(input_df)
-            
-            # FIX: Ensure 2D array and handle any NaNs
-            input_scaled = np.nan_to_num(input_scaled)  # replace NaNs with 0
+            input_scaled = np.nan_to_num(input_scaled)
             if input_scaled.ndim == 1:
                 input_scaled = input_scaled.reshape(1, -1)
             
             # PREDICTION
             pred = model.predict(input_scaled)[0]
-            proba = model.predict_proba(input_scaled)[0]
-            
+            proba = model.predict_proba(input_scaled)
+            proba = proba[0]  # ensure first row
+            risk_score = float(proba[1]) * 100  # ALWAYS 0-100
+
             st.session_state.prediction = pred
             st.session_state.proba = proba
             st.session_state.risk = risk_level_label
@@ -260,9 +252,9 @@ else:
                 "RiskLevel": risk_level_label,
                 "BMICategory": bmi_category_label,
                 "Prediction": "Diabetic" if pred == 1 else "Not Diabetic",
-                "Probability_Not_Diabetic": round(proba[0], 4),
-                "Probability_Diabetic": round(proba[1], 4),
-                "Risk_Score": round(proba[1] * 100, 1)
+                "Probability_Not_Diabetic": round(float(proba[0]), 4),
+                "Probability_Diabetic": round(float(proba[1]), 4),
+                "Risk_Score": round(risk_score, 1)
             }
             st.session_state.predictions_list.append(record)
             save_prediction(record)
